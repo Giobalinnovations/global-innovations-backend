@@ -1,51 +1,26 @@
 import mongoose from 'mongoose';
 import Blog from '../models/blogsModel.js';
 import Category from '../models/categoryModel.js';
-
 const getAllBlogs = async (req, res, next) => {
   try {
-    const queryObj = { ...req.query };
-
-    const excludedFields = ['page', 'sort', 'limit', 'fields', 'category'];
-    excludedFields.forEach(el => delete queryObj[el]);
-
-    let queryStr = JSON.stringify(queryObj);
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
-    let query = Blog.find(JSON.parse(queryStr));
-
-    if (req.query.sort) {
-      const parts = req.query.sort.split(':');
-      query = query.sort({ [parts[0]]: parts[1] === 'desc' ? -1 : 1 });
-    }
-
-    if (req.query.fields) {
-      const fields = req.query.fields.split(',').join(' ');
-      query = query.select(fields);
-    }
-
-    if (req.query.category) {
-      query = query.where('category').equals(req.query.category);
-    }
-
     const page = req.query.page * 1 || 1;
     const limit = req.query.limit * 1 || 100;
     const skip = (page - 1) * limit;
-    query = query.skip(skip).limit(limit);
 
-    if (req.query.page) {
-      const numBlogs = await Blog.countDocuments();
-      if (skip >= numBlogs) throw new Error('This page does not exist');
-    }
-
-    const blogs = await query.populate('category');
+    const blogs = await Blog.find({})
+      .skip(skip)
+      .limit(limit)
+      .populate('category');
+    const categories = await Category.find({});
+    const numBlogs = await Blog.countDocuments();
+    const totalPages = Math.ceil(numBlogs / limit);
 
     res.status(200).json({
-      message: 'success',
-      results: blogs.length,
       data: blogs,
+      categories,
+      totalPages,
     });
   } catch (error) {
-    // next(error);
     res.status(404).json({ message: 'Fail', error: error.message });
   }
 };
